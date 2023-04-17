@@ -2737,7 +2737,7 @@ namespace WpfHexaEditor
                     {
                         updateFocus = true;
                         rtn = true;
-                    };
+                    }
                 }, ref rtn);
             }
 
