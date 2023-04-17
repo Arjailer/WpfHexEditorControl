@@ -2707,7 +2707,7 @@ namespace WpfHexaEditor
             UpdateHighLight();
             UpdateStatusBar(false);
             UpdateVisual();
-            UpdateFocus();
+            UpdateFocusButDontSteal();
 
             if (controlResize)
             {
@@ -2719,6 +2719,30 @@ namespace WpfHexaEditor
             watch.Stop();
             Debug.Print($"REFRESH TIME: {watch.Elapsed.Milliseconds} ms");
 #endif
+        }
+
+        // Update the focus, IF the control already has the focus, but don't steal focus from another control
+        private void UpdateFocusButDontSteal()
+        {
+            // Is the top-level control focused?
+            bool updateFocus = IsFocused;
+
+            // Is a hex byte focused?
+            if (!updateFocus)
+            {
+                bool rtn = false;
+                TraverseHexBytes(ctrl =>
+                {
+                    if (ctrl.IsFocused)
+                    {
+                        updateFocus = true;
+                        rtn = true;
+                    };
+                }, ref rtn);
+            }
+
+            if (updateFocus)
+                UpdateFocus();
         }
 
         /// <summary>
