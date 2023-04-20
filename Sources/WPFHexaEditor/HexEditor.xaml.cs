@@ -4143,6 +4143,7 @@ namespace WpfHexaEditor
         /// Allow or not the context menu to appear on right-click
         /// </summary>
         public bool AllowContextMenu { get; set; } = true;
+        public bool RightClickUpdatesSelection { get; set; } = true;
 
         private void Control_RightClick(object sender, EventArgs e)
         {
@@ -4152,7 +4153,7 @@ namespace WpfHexaEditor
             if (sender is IByteControl ctrl)
                 _rightClickBytePosition = ctrl.BytePositionInStream;
 
-            if (SelectionLength <= 1)
+            if (SelectionLength <= 1 && RightClickUpdatesSelection)
             {
                 SelectionStart = _rightClickBytePosition;
                 SelectionStop = _rightClickBytePosition;
