@@ -1762,6 +1762,15 @@ namespace WpfHexaEditor
         public void SetPosition(string hexLiteralPosition, long byteLength) =>
             SetPosition(HexLiteralToLong(hexLiteralPosition).position, byteLength);
 
+        public void SetPositionAndCentre(long position, long byteLength)
+        {
+            SelectionStart = position;
+            SelectionStop = position + byteLength - 1;
+
+            if (!IsBytePositionAreVisible(position))
+                VerticalScrollBar.Value = CheckIsOpen(_provider) ? GetLineNumber(position) - (MaxVisibleLine / 2) : 0;
+        }
+
         /// <summary>
         /// Give a next valid position
         /// </summary>
