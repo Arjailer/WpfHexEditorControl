@@ -1095,7 +1095,9 @@ namespace WpfHexaEditor
 
                 if (actualheight < 0) actualheight = 0;
 
-                return (int)(actualheight / (LineHeight * ZoomScale)) + 1;
+                int value = (int)(actualheight / (LineHeight * ZoomScale)) + 1;
+
+                return value - 1; // -1 so we don't get lines half-off the bottom of the control
             }
         }
 
@@ -2921,7 +2923,8 @@ namespace WpfHexaEditor
                 {
                     if (_viewBuffer is not null)
                     {
-                        BuildDataLines(MaxVisibleLine, MaxLinePreloaded < MaxVisibleLine);
+                        // != so that it rebuild when the control is growning AND shrinking
+                        BuildDataLines(MaxVisibleLine, MaxLinePreloaded != MaxVisibleLine);
 
                         if (_viewBuffer.Length < bufferlength)
                         {
@@ -3273,6 +3276,10 @@ namespace WpfHexaEditor
 
             #endregion
 
+            // If the lines are more than "visible lines" remove them
+            if (linesCount > maxVisibleLine)
+                RemoveOverflowingLineInfos(maxVisibleLine);
+
             ClearLineInfo();
 
             if (!CheckIsOpen(_provider)) return;
@@ -3355,6 +3362,19 @@ namespace WpfHexaEditor
                 #endregion
             }
         }
+
+        private void RemoveOverflowingLineInfos(int maxVisibleLine)
+        {
+            for (int i = LinesInfoStackPanel.Children.Count - 1; i >= 0; i--)
+            {
+                if (LinesInfoStackPanel.Children[i] is FastTextLine lineInfo)
+                    LinesInfoStackPanel.Children.RemoveAt(i);
+
+                if (LinesInfoStackPanel.Children.Count == maxVisibleLine)
+                    break;
+            }
+        }
+
         #endregion Update view
 
         #region First/Last visible byte methods

@@ -179,7 +179,9 @@ namespace WpfHexaEditor.Core
         TwoByte = 2,
         FourByte = 4,
         SixByte = 6,
-        EightByte = 8
+        EightByte = 8,
+        SixteenByte = 16,
+        ThirtTwoByte = 32,
     }
 
     public enum ByteSpacerPosition
