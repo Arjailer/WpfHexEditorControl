@@ -176,7 +176,7 @@ namespace WpfHexaEditor.Core.Bytes
 
             try
             {
-                _stream = File.Open(FileName, FileMode.Open, FileAccess.ReadWrite, FileShare.Read);
+                _stream = File.Open(FileName, FileMode.Open, FileAccess.ReadWrite, ReadOnlyMode ? FileShare.ReadWrite : FileShare.Read);
             }
             catch
             {
