@@ -33,6 +33,7 @@ namespace WpfHexaEditor
         private IByte _byte;
         private bool _isHighLight;
         private bool _tooltipLoaded;
+        private bool _isCurrentLine;
         #endregion global class variables
 
         #region Events
@@ -137,6 +138,20 @@ namespace WpfHexaEditor
                 UpdateVisual();
             }
         }
+
+        public bool IsCurrentLine
+        {
+            get => _isCurrentLine;
+            set
+            {
+                if (value == _isCurrentLine) return;
+
+                _isCurrentLine = value;
+                UpdateVisual();
+            }
+        }
+
+       public Brush CurrentLineBrush { get; set; } = Brushes.Transparent;
 
         /// <summary>
         /// Byte used for this instance
@@ -278,7 +293,10 @@ namespace WpfHexaEditor
 
                 Description = cbb is not null ? cbb.Description : "";
 
-                Background = cbb is not null ? cbb.Color : Brushes.Transparent;
+                if (cbb is not null)
+                    Background = cbb.Color;
+                else
+                    Background = IsCurrentLine ? CurrentLineBrush : Brushes.Transparent;
 
                 Foreground = _parent.GetColumnNumber(BytePositionInStream) % 2 == 0
                     ? _parent.Foreground

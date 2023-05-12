@@ -5,6 +5,7 @@
 //////////////////////////////////////////////
 
 using System;
+using System.Windows.Media;
 using WpfHexaEditor.Core.EventArguments;
 
 namespace WpfHexaEditor.Core.Interfaces
@@ -24,6 +25,9 @@ namespace WpfHexaEditor.Core.Interfaces
         bool InternalChange { get; set; }
         bool IsMouseOverMe { get; }
         bool IsEnabled { get; set; }
+
+        bool IsCurrentLine { get; set; }
+        Brush CurrentLineBrush { get; set; }
 
         //Methods
         void UpdateVisual();

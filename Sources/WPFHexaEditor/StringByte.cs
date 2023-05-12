@@ -164,7 +164,11 @@ namespace WpfHexaEditor
 
                 Description = cbb is not null ? cbb.Description : "";
 
-                Background = cbb is not null ? cbb.Color : Brushes.Transparent;
+                if (cbb is not null)
+                    Background = cbb.Color;
+                else
+                    Background = IsCurrentLine ? CurrentLineBrush : Brushes.Transparent;
+
                 FontWeight = _parent.FontWeight;
                 Foreground = _parent.Foreground;
 

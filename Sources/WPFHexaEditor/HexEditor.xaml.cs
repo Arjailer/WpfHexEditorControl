@@ -134,6 +134,8 @@ namespace WpfHexaEditor
         /// </summary>
         private bool _allowZoom = true;
 
+        private Brush _currentLineBrush = Brushes.Transparent;
+
         #endregion Global Class variables
 
         #region Events
@@ -581,10 +583,26 @@ namespace WpfHexaEditor
             ctrl.RefreshView(true);
         }
 
+        public Brush CurrentLineBrush
+        {
+            get { return _currentLineBrush; }
+            set
+            {
+                if (value == _currentLineBrush) return;
+
+                _currentLineBrush = value;
+                TraverseHexAndStringBytes(ctrl => { ctrl.CurrentLineBrush = value; });
+            }
+        }
+
         /// <summary>
         /// Call Updatevisual methods for all IByteControl
         /// </summary>
-        public void UpdateVisual() => TraverseHexAndStringBytes(ctrl => { ctrl.UpdateVisual(); });
+        public void UpdateVisual() => TraverseHexAndStringBytes(ctrl =>
+        {
+            ctrl.IsCurrentLine = GetLineNumber(ctrl.BytePositionInStream) == SelectionLine;
+            ctrl.UpdateVisual();
+        });
 
         #endregion Colors/fonts property and methods
 
@@ -2899,6 +2917,9 @@ namespace WpfHexaEditor
                         c.CtrlyKey += Control_CTRLYKey;
 
                         #endregion
+
+                        // Set initial value for current line brush
+                        c.CurrentLineBrush = CurrentLineBrush;
                     });
 
                 });
@@ -3171,7 +3192,11 @@ namespace WpfHexaEditor
                 ctrl.IsSelected = ctrl.BytePositionInStream >= minSelect &&
                                   ctrl.BytePositionInStream <= maxSelect &&
                                   ctrl.BytePositionInStream != -1
-&& ctrl.Action != ByteAction.Deleted;
+                                  && ctrl.Action != ByteAction.Deleted;
+
+                ctrl.IsCurrentLine = GetLineNumber(ctrl.BytePositionInStream) == SelectionLine;
+
+                ctrl.UpdateVisual();
             });
         }
         /// <summary>
