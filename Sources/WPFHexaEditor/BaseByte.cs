@@ -58,6 +58,10 @@ namespace WpfHexaEditor
         public event EventHandler CtrlcKey;
         public event EventHandler CtrlaKey;
         public event EventHandler CtrlyKey;
+        public event EventHandler<ByteEventArgs> MoveHome;
+        public event EventHandler<ByteEventArgs> MoveEnd;
+        public event EventHandler MoveCtrlHome;
+        public event EventHandler MoveCtrlEnd;
 
         #endregion Events
 
@@ -249,10 +253,7 @@ namespace WpfHexaEditor
 
         #region Methods
 
-        /// <summary>
-        /// Update Background,foreground and font property
-        /// </summary>
-        public virtual void UpdateVisual()
+        private void UpdateColors()
         {
             if (IsSelected)
             {
@@ -304,6 +305,14 @@ namespace WpfHexaEditor
 
                 FontWeight = _parent.FontWeight;
             }
+        }
+
+        /// <summary>
+        /// Update Background,foreground and font property
+        /// </summary>
+        public virtual void UpdateVisual()
+        {
+            UpdateColors();
 
             UpdateAutoHighLiteSelectionByteVisual();
 
@@ -412,19 +421,11 @@ namespace WpfHexaEditor
 
         protected override void OnMouseLeave(MouseEventArgs e)
         {
-            var cbb = _parent.GetCustomBackgroundBlock(BytePositionInStream);
-
             if (Byte is not null && !IsSelected && !IsHighLight &&
                 Action != ByteAction.Modified &&
                 Action != ByteAction.Deleted &&
                 Action != ByteAction.Added)
-                Background = Brushes.Transparent;
-
-            if (cbb is not null && !IsSelected && !IsHighLight &&
-                Action != ByteAction.Modified &&
-                Action != ByteAction.Deleted &&
-                Action != ByteAction.Added)
-                Background = cbb.Color;
+                UpdateColors();
 
             IsMouseOverMe = false;
 
@@ -520,6 +521,36 @@ namespace WpfHexaEditor
 
                 return true;
             }
+
+            if (KeyValidator.IsHomeKey(e.Key))
+            {
+                e.Handled = true;
+                MoveHome?.Invoke(this, new ByteEventArgs(BytePositionInStream));
+
+                return true;
+            }
+            if (KeyValidator.IsEndKey(e.Key))
+            {
+                e.Handled = true;
+                MoveEnd?.Invoke(this, new ByteEventArgs(BytePositionInStream));
+
+                return true;
+            }
+            if (KeyValidator.IsCtrlHomeKey(e.Key))
+            {
+                e.Handled = true;
+                MoveCtrlHome?.Invoke(this, new EventArgs());
+
+                return true;
+            }
+            if (KeyValidator.IsCtrlEndKey(e.Key))
+            {
+                e.Handled = true;
+                MoveCtrlEnd?.Invoke(this, new EventArgs());
+
+                return true;
+            }
+
             if (KeyValidator.IsDeleteKey(e.Key))
             {
                 if (!ReadOnlyMode)

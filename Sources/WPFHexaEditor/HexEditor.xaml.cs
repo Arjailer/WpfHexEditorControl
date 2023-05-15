@@ -1320,6 +1320,68 @@ namespace WpfHexaEditor
             SetFocusAtSelectionStart();
         }
 
+        private void Control_MoveHome(object sender, ByteEventArgs e)
+        {
+            // TODO <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+        }
+
+        private void Control_MoveEnd(object sender, ByteEventArgs e)
+        {
+            // TODO <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+        }
+
+        private void Control_MoveCtrlHome(object sender, EventArgs e)
+        {
+            //Prevent infinite loop
+            _setFocusTest = false;
+
+            //Get the new position
+            var newPosition = 0;
+
+            if (Keyboard.Modifiers.HasFlag(ModifierKeys.Shift))
+            {
+                SelectionStop = SelectionStart;
+                SelectionStart = newPosition;
+            }
+            else
+            {
+                FixSelectionStartStop();
+
+                if (newPosition > -1)
+                    SelectionStart = SelectionStop = newPosition;
+            }
+
+            VerticalScrollBar.Value = 0;
+
+            SetFocusAtSelectionStart();
+        }
+
+        private void Control_MoveCtrlEnd(object sender, EventArgs e)
+        {
+            //Prevent infinite loop
+            _setFocusTest = false;
+
+            //Get the new position
+            var newPosition = Length -1;
+
+            if (Keyboard.Modifiers.HasFlag(ModifierKeys.Shift))
+            {
+                SelectionStop = SelectionStart;
+                SelectionStart = newPosition;
+            }
+            else
+            {
+                FixSelectionStartStop();
+
+                if (newPosition > -1)
+                    SelectionStart = SelectionStop = newPosition;
+            }
+
+            VerticalScrollBar.Value = VerticalScrollBar.Maximum;
+
+            SetFocusAtSelectionStart();
+        }
+
         private void Control_MouseSelection(object sender, EventArgs e)
         {
             //Prevent false mouse selection on file open
@@ -2892,6 +2954,10 @@ namespace WpfHexaEditor
                         c.CtrlcKey -= Control_CTRLCKey;
                         c.CtrlvKey -= Control_CTRLVKey;
                         c.CtrlyKey -= Control_CTRLYKey;
+                        c.MoveHome -= Control_MoveHome;
+                        c.MoveEnd -= Control_MoveEnd;
+                        c.MoveCtrlHome -= Control_MoveCtrlHome;
+                        c.MoveCtrlEnd -= Control_MoveCtrlEnd;
                         #endregion
 
                         #region Attach events
@@ -2915,7 +2981,10 @@ namespace WpfHexaEditor
                         c.CtrlcKey += Control_CTRLCKey;
                         c.CtrlvKey += Control_CTRLVKey;
                         c.CtrlyKey += Control_CTRLYKey;
-
+                        c.MoveHome += Control_MoveHome;
+                        c.MoveEnd += Control_MoveEnd;
+                        c.MoveCtrlHome += Control_MoveCtrlHome;
+                        c.MoveCtrlEnd += Control_MoveCtrlEnd;
                         #endregion
 
                         // Set initial value for current line brush

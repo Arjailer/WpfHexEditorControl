@@ -54,5 +54,9 @@ namespace WpfHexaEditor.Core.Interfaces
         event EventHandler CtrlcKey;
         event EventHandler CtrlaKey;
         event EventHandler CtrlyKey;
+        public event EventHandler<ByteEventArgs> MoveHome;
+        public event EventHandler<ByteEventArgs> MoveEnd;
+        public event EventHandler MoveCtrlHome;
+        public event EventHandler MoveCtrlEnd;
     }
 }
