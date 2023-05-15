@@ -1355,6 +1355,10 @@ namespace WpfHexaEditor
             //Get the new position
             var newPosition = GetValidPositionFrom(SelectionStart, (BytePerLine - (SelectionStart % BytePerLine) - 1));
 
+            //Handle last-line
+            if (newPosition > Length - 1)
+                newPosition = Length - 1;
+
             if (Keyboard.Modifiers.HasFlag(ModifierKeys.Shift))
                 SelectionStart = newPosition < _provider.Length ? newPosition : _provider.Length;
             else
