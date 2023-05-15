@@ -1322,12 +1322,56 @@ namespace WpfHexaEditor
 
         private void Control_MoveHome(object sender, ByteEventArgs e)
         {
-            // TODO <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+            //Prevent infinite loop
+            _setFocusTest = false;
+
+            //Get the new position
+            var newPosition = GetValidPositionFrom(SelectionStart, -SelectionStart % BytePerLine);
+
+            if (Keyboard.Modifiers.HasFlag(ModifierKeys.Shift))
+                SelectionStart = newPosition < _provider.Length ? newPosition : _provider.Length;
+            else
+            {
+                FixSelectionStartStop();
+
+                if (newPosition < _provider.Length)
+                    SelectionStart = SelectionStop = newPosition;
+            }
+
+            if (AllowVisualByteAddress && SelectionStart > VisualByteAdressStop)
+                SelectionStart = VisualByteAdressStop;
+
+            if (SelectionStart > LastVisibleBytePosition)
+                VerticalScrollBar.Value++;
+
+            SetFocusAtSelectionStart();
         }
 
         private void Control_MoveEnd(object sender, ByteEventArgs e)
         {
-            // TODO <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+            //Prevent infinite loop
+            _setFocusTest = false;
+
+            //Get the new position
+            var newPosition = GetValidPositionFrom(SelectionStart, (BytePerLine - (SelectionStart % BytePerLine) - 1));
+
+            if (Keyboard.Modifiers.HasFlag(ModifierKeys.Shift))
+                SelectionStart = newPosition < _provider.Length ? newPosition : _provider.Length;
+            else
+            {
+                FixSelectionStartStop();
+
+                if (newPosition < _provider.Length)
+                    SelectionStart = SelectionStop = newPosition;
+            }
+
+            if (AllowVisualByteAddress && SelectionStart > VisualByteAdressStop)
+                SelectionStart = VisualByteAdressStop;
+
+            if (SelectionStart > LastVisibleBytePosition)
+                VerticalScrollBar.Value++;
+
+            SetFocusAtSelectionStart();
         }
 
         private void Control_MoveCtrlHome(object sender, EventArgs e)
