@@ -600,7 +600,7 @@ namespace WpfHexaEditor
         /// </summary>
         public void UpdateVisual() => TraverseHexAndStringBytes(ctrl =>
         {
-            ctrl.IsCurrentLine = GetLineNumber(ctrl.BytePositionInStream) == SelectionLine;
+            ctrl.IsCurrentLine = Length > 0 && GetLineNumber(ctrl.BytePositionInStream) == SelectionLine;
             ctrl.UpdateVisual();
         });
 
@@ -3194,7 +3194,7 @@ namespace WpfHexaEditor
                                   ctrl.BytePositionInStream != -1
                                   && ctrl.Action != ByteAction.Deleted;
 
-                ctrl.IsCurrentLine = GetLineNumber(ctrl.BytePositionInStream) == SelectionLine;
+                ctrl.IsCurrentLine = Length > 0 && GetLineNumber(ctrl.BytePositionInStream) == SelectionLine;
 
                 ctrl.UpdateVisual();
             });
