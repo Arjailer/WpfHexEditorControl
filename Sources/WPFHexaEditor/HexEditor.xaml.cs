@@ -2814,7 +2814,7 @@ namespace WpfHexaEditor
                     c.Visibility = Visibility.Visible;
                     c.SmallChange = 1;
                     c.LargeChange = ScrollLargeChange;
-                    c.Maximum = MaxLine - MaxVisibleLine + 1;
+                    c.Maximum = MaxLine - MaxVisibleLine;
                 });
         #endregion
 
@@ -2828,6 +2828,7 @@ namespace WpfHexaEditor
 
             if (!CheckIsOpen(_provider)) BuildDataLines(MaxVisibleLine);
 
+            UpdateScrollBar();
             RefreshView(true);
         }
 
