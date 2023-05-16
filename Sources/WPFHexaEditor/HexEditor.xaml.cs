@@ -1221,6 +1221,11 @@ namespace WpfHexaEditor
 
                 if (newPosition > -1)
                     SelectionStart = SelectionStop = newPosition;
+                else
+                {
+                    newPosition = SelectionStart % BytePerLine; // move to initial position in line
+                    SelectionStart = SelectionStop = newPosition;
+                }
             }
 
             if (AllowVisualByteAddress && SelectionStart > VisualByteAdressStart)
@@ -1252,6 +1257,19 @@ namespace WpfHexaEditor
 
                 if (newPosition < _provider.Length)
                     SelectionStart = SelectionStop = newPosition;
+                else
+                {
+                    long positionInLine = SelectionStart % BytePerLine;
+
+                    newPosition = _provider.Length - 1; // move to end of file
+                    newPosition = GetValidPositionFrom(newPosition, -newPosition % BytePerLine); // move to start of last line
+                    newPosition = GetValidPositionFrom(newPosition, positionInLine); // move to initial position in line
+
+                    if (newPosition >= _provider.Length)
+                        newPosition = _provider.Length - 1;
+
+                    SelectionStart = SelectionStop = newPosition;
+                }
             }
 
             if (AllowVisualByteAddress && SelectionStart > VisualByteAdressStop)
@@ -1334,7 +1352,7 @@ namespace WpfHexaEditor
             {
                 FixSelectionStartStop();
 
-                if (newPosition < _provider.Length)
+                if (newPosition > -1)
                     SelectionStart = SelectionStop = newPosition;
             }
 
@@ -1410,7 +1428,7 @@ namespace WpfHexaEditor
             _setFocusTest = false;
 
             //Get the new position
-            var newPosition = Length -1;
+            var newPosition = _provider.Length - 1;
 
             if (Keyboard.Modifiers.HasFlag(ModifierKeys.Shift))
             {
