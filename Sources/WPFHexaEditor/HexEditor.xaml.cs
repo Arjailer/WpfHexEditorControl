@@ -1213,19 +1213,17 @@ namespace WpfHexaEditor
             //Get the new position from SelectionStart down one page
             var newPosition = GetValidPositionFrom(SelectionStart, -(BytePerLine * MaxVisibleLine));
 
+            //Handle going "off the top"
+            if (newPosition < 0)
+                newPosition = SelectionStart % BytePerLine;
+
             if (Keyboard.Modifiers == ModifierKeys.Shift)
                 SelectionStart = newPosition < _provider.Length ? newPosition : 0;
             else
             {
                 FixSelectionStartStop();
 
-                if (newPosition > -1)
-                    SelectionStart = SelectionStop = newPosition;
-                else
-                {
-                    newPosition = SelectionStart % BytePerLine; // move to initial position in line
-                    SelectionStart = SelectionStop = newPosition;
-                }
+                SelectionStart = SelectionStop = newPosition;
             }
 
             if (AllowVisualByteAddress && SelectionStart > VisualByteAdressStart)
@@ -1249,27 +1247,26 @@ namespace WpfHexaEditor
             //Get the new position from SelectionStart down one page
             var newPosition = GetValidPositionFrom(SelectionStart, BytePerLine * MaxVisibleLine);
 
+            //Handle going "off the bottom"
+            if (newPosition >= _provider.Length)
+            {
+                long positionInLine = SelectionStart % BytePerLine;
+
+                newPosition = _provider.Length - 1; // move to end of file
+                newPosition = GetValidPositionFrom(newPosition, -newPosition % BytePerLine); // move to start of last line
+                newPosition = GetValidPositionFrom(newPosition, positionInLine); // move to initial position in line
+
+                if (newPosition >= _provider.Length)
+                    newPosition = _provider.Length - 1;
+            }
+
             if (Keyboard.Modifiers == ModifierKeys.Shift)
                 SelectionStart = newPosition < _provider.Length ? newPosition : _provider.Length;
             else
             {
                 FixSelectionStartStop();
 
-                if (newPosition < _provider.Length)
-                    SelectionStart = SelectionStop = newPosition;
-                else
-                {
-                    long positionInLine = SelectionStart % BytePerLine;
-
-                    newPosition = _provider.Length - 1; // move to end of file
-                    newPosition = GetValidPositionFrom(newPosition, -newPosition % BytePerLine); // move to start of last line
-                    newPosition = GetValidPositionFrom(newPosition, positionInLine); // move to initial position in line
-
-                    if (newPosition >= _provider.Length)
-                        newPosition = _provider.Length - 1;
-
-                    SelectionStart = SelectionStop = newPosition;
-                }
+                SelectionStart = SelectionStop = newPosition;
             }
 
             if (AllowVisualByteAddress && SelectionStart > VisualByteAdressStop)
