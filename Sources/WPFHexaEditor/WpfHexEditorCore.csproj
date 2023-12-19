@@ -21,6 +21,7 @@
     <FileVersion>2.1.7</FileVersion>
     <Version>2.1.7</Version>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
+    <GenerateBindingRedirectsOutputType>true</GenerateBindingRedirectsOutputType>
     <PackageTags>character-table;hexadecimal;binary;editor;hexeditor;tbl;hexedit</PackageTags>
     <ApplicationIcon />
     <LangVersion>preview</LangVersion>
