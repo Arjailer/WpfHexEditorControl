@@ -33,6 +33,7 @@
     <IncludeSymbols>false</IncludeSymbols>
     <NeutralLanguage>en-US</NeutralLanguage>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <Nullable>disable</Nullable>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Debug|netcoreapp3.1|AnyCPU'">
     <DefineConstants>TRACE;DEBUG</DefineConstants>
