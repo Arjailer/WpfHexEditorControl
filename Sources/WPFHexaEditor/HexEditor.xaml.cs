@@ -2015,12 +2015,26 @@ namespace WpfHexaEditor
                     {
                         ctrl.HexHeaderStackPanel.Visibility = Visibility.Visible;
                         ctrl.TopRectangle.Visibility = Visibility.Visible;
+
+                        // Re-size the header and resize the data area to account for it
+                        ctrl.BaseGrid.RowDefinitions[0].Height = new GridLength(30);
+                        ctrl.BaseGrid.UpdateLayout();
+                        ctrl.BuildDataLines(ctrl.MaxVisibleLine, true);
+                        ctrl.UpdateScrollBar();
+                        ctrl.RefreshView(true, true);
                     }
                     break;
 
                 case Visibility.Collapsed:
                     ctrl.HexHeaderStackPanel.Visibility = Visibility.Collapsed;
                     ctrl.TopRectangle.Visibility = Visibility.Collapsed;
+
+                    // Shrink the header and resize the data area to fill the space
+                    ctrl.BaseGrid.RowDefinitions[0].Height = new GridLength(0);
+                    ctrl.BaseGrid.UpdateLayout();
+                    ctrl.BuildDataLines(ctrl.MaxVisibleLine, true);
+                    ctrl.UpdateScrollBar();
+                    ctrl.RefreshView(true, true);
                     break;
             }
         }
