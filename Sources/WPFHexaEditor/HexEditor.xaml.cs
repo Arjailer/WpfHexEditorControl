@@ -27,7 +27,6 @@ using WpfHexaEditor.Core.MethodExtention;
 using WpfHexaEditor.Dialog;
 using static WpfHexaEditor.Core.Bytes.ByteConverters;
 using static WpfHexaEditor.Core.Bytes.ByteProvider;
-using Path = System.IO.Path;
 
 namespace WpfHexaEditor
 {
@@ -5046,7 +5045,7 @@ namespace WpfHexaEditor
                     if (FileDroppingConfirmation)
                     {
                         if (MessageBox.Show(
-                            $"{Properties.Resources.FileDroppingConfirmationString} {Path.GetFileName(filename[0])} ?",
+                            $"{Properties.Resources.FileDroppingConfirmationString} {System.IO.Path.GetFileName(filename[0])} ?",
                                 ApplicationName, MessageBoxButton.YesNo) == MessageBoxResult.Yes)
                             FileName = filename[0];
                     }
