@@ -1658,6 +1658,7 @@ namespace WpfHexaEditor
             VerticalScrollBar.Value = 0;
 
             SetFocusAtSelectionStart();
+            UpdateVisual();
         }
 
         private void Control_MoveCtrlEnd(object sender, EventArgs e)
@@ -1684,6 +1685,7 @@ namespace WpfHexaEditor
             VerticalScrollBar.Value = VerticalScrollBar.Maximum;
 
             SetFocusAtSelectionStart();
+            UpdateVisual();
         }
 
         private void Control_MouseSelection(object sender, EventArgs e)
