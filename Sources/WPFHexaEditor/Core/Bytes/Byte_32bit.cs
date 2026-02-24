@@ -42,10 +42,10 @@ namespace WpfHexaEditor.Core.Bytes
             var prefix = "";
 
             var byteValue = (order == ByteOrderType.HiLo)
-                ? Byte.ToArray().Reverse().ToArray()
+                ? Byte.ToArray().AsEnumerable().Reverse().ToArray()
                 : Byte.ToArray();
             var originValue = (order == ByteOrderType.HiLo)
-                ? OriginByte.ToArray().Reverse().ToArray()
+                ? OriginByte.ToArray().AsEnumerable().Reverse().ToArray()
                 : OriginByte.ToArray();
             var ByteInt = System.BitConverter.ToUInt32(byteValue, 0);
             var OriginInt = System.BitConverter.ToUInt32(originValue, 0);
@@ -99,7 +99,7 @@ namespace WpfHexaEditor.Core.Bytes
                         break;
                     case DataVisualType.Decimal:
                         text = (sign_positive ? "" : "-") + prefix +
-                            System.BitConverter.ToUInt32(value.Reverse().ToArray(), 0).ToString("d10");
+                            System.BitConverter.ToUInt32(value.AsEnumerable().Reverse().ToArray(), 0).ToString("d10");
                         break;
                     case DataVisualType.Binary:
                         text = (sign_positive ? "" : "-") + prefix +
