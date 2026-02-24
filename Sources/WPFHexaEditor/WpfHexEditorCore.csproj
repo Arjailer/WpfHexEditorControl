@@ -1,6 +1,6 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk.WindowsDesktop">
   <PropertyGroup>
-	  <TargetFrameworks>net48;net8.0-windows</TargetFrameworks>
+	<TargetFrameworks>net8.0-windows</TargetFrameworks>
     <UseWPF>true</UseWPF>
     <RootNamespace>WpfHexaEditor</RootNamespace>
     <AssemblyName>WPFHexaEditor</AssemblyName>
