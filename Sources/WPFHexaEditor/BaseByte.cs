@@ -293,7 +293,7 @@ namespace WpfHexaEditor
         /// <summary>
         /// Update Background,foreground and font property
         /// </summary>
-        public virtual void UpdateColors()
+        public virtual void UpdateVisual()
         {
             if (IsSelected)
             {
@@ -345,14 +345,6 @@ namespace WpfHexaEditor
 
                 FontWeight = _parent.FontWeight;
             }
-        }
-
-        /// <summary>
-        /// Update Background,foreground and font property
-        /// </summary>
-        public virtual void UpdateVisual()
-        {
-            UpdateColors();
 
             UpdateAutoHighLiteSelectionByteVisual();
 
@@ -485,7 +477,7 @@ namespace WpfHexaEditor
                 Action != ByteAction.Modified &&
                 Action != ByteAction.Deleted &&
                 Action != ByteAction.Added)
-                UpdateColors();
+                UpdateVisual();
 
             IsMouseOverMe = false;
 
