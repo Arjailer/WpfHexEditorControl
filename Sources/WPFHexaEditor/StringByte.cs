@@ -32,6 +32,9 @@ namespace WpfHexaEditor
         {
             _barchart = barChart;
             _width = desiredWidth;
+
+            //Margin is constant per control; set once instead of on every render
+            Margin = barChart ? new Thickness(2) : new Thickness(0);
         }
 
         #endregion Contructor
@@ -198,7 +201,6 @@ namespace WpfHexaEditor
             if (_barchart)
             {
                 Width = _width;
-                Margin = new Thickness(2);
 
                 #region Draw control
                 //Draw background
@@ -218,8 +220,6 @@ namespace WpfHexaEditor
             }
             else
             {
-                Margin = new Thickness(0);
-
                 base.OnRender(dc);
 
                 #region Update width of control 

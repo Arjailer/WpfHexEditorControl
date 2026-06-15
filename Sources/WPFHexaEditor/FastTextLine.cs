@@ -60,8 +60,9 @@ namespace WpfHexaEditor
 
         public static readonly DependencyProperty TextProperty =
             DependencyProperty.Register(nameof(Text), typeof(string), typeof(FastTextLine),
-                new FrameworkPropertyMetadata(string.Empty,
-                    FrameworkPropertyMetadataOptions.AffectsRender | FrameworkPropertyMetadataOptions.AffectsMeasure));
+                //Only AffectsRender: width is set explicitly in OnRender when AutoWidth is on,
+                //so a text change repaints without forcing a measure pass per scrolled line.
+                new FrameworkPropertyMetadata(string.Empty, FrameworkPropertyMetadataOptions.AffectsRender));
 
         /// <summary>
         /// Text to be displayed representation of Byte
@@ -106,6 +107,20 @@ namespace WpfHexaEditor
             DependencyProperty.Register(nameof(RenderPoint), typeof(Point), typeof(FastTextLine),
                 new FrameworkPropertyMetadata(new Point(0, 0), FrameworkPropertyMetadataOptions.AffectsMeasure));
 
+        /// <summary>
+        /// Set the highlight (weight + foreground) and repaint only if something actually changed.
+        /// Used for cheap per-keystroke header column highlighting.
+        /// </summary>
+        internal void SetHighLight(FontWeight weight, Brush foreground)
+        {
+            if (FontWeight == weight && ReferenceEquals(Foreground, foreground))
+                return;
+
+            FontWeight = weight;
+            Foreground = foreground;
+            InvalidateVisual();
+        }
+
         #endregion
 
         /// <summary>
@@ -117,10 +132,9 @@ namespace WpfHexaEditor
             if (Background is not null)
                 dc.DrawRectangle(Background, null, new Rect(0, 0, RenderSize.Width, RenderSize.Height));
 
-            //Draw text
+            //Draw text (typeface and pixelsPerDip are cached on the parent to avoid per-render allocation)
             var formatedText = new FormattedText(Text, CultureInfo.InvariantCulture, FlowDirection.LeftToRight,
-                new Typeface(_parent.FontFamily, _parent.FontStyle, FontWeight, _parent.FontStretch),
-                    _parent.FontSize, Foreground, VisualTreeHelper.GetDpi(this).PixelsPerDip);
+                _parent.GetTypeface(FontWeight), _parent.FontSize, Foreground, _parent.PixelsPerDip);
 
             dc.DrawText(formatedText, new Point(RenderPoint.X, RenderPoint.Y));
 

@@ -226,8 +226,10 @@ namespace WpfHexaEditor
 
         private static readonly DependencyProperty TextProperty =
             DependencyProperty.Register(nameof(Text), typeof(string), typeof(BaseByte),
-                new FrameworkPropertyMetadata(string.Empty,
-                    FrameworkPropertyMetadataOptions.AffectsRender | FrameworkPropertyMetadataOptions.AffectsMeasure));
+                //Only AffectsRender: cell width is controlled independently (fixed for HexByte,
+                //set explicitly in StringByte.OnRender), so a text change must repaint but must
+                //not force a measure/arrange pass on every scrolled byte.
+                new FrameworkPropertyMetadata(string.Empty, FrameworkPropertyMetadataOptions.AffectsRender));
 
         /// <summary>
         /// Text to be displayed representation of Byte
@@ -389,11 +391,10 @@ namespace WpfHexaEditor
             if (Background is not null)
                 dc.DrawRectangle(Background, null, new Rect(0, 0, RenderSize.Width, RenderSize.Height));
 
-            //Draw text
-            var typeface = new Typeface(_parent.FontFamily, _parent.FontStyle, FontWeight, _parent.FontStretch);
-
-            var formattedText = new FormattedText(Text, CultureInfo.InvariantCulture, FlowDirection.LeftToRight,
-                typeface, _parent.FontSize, Foreground, VisualTreeHelper.GetDpi(this).PixelsPerDip);
+            //Draw text. The FormattedText is cached and reused on the parent — byte cells draw
+            //from a small repeating set of strings, so this avoids rebuilding/reshaping text on
+            //every paint of every cell.
+            var formattedText = _parent.GetFormattedText(Text, Foreground, FontWeight);
 
             dc.DrawText(formattedText, new Point(2, 2));
 

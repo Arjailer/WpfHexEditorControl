@@ -9,6 +9,7 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -17,6 +18,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Shapes;
+using System.Windows.Threading;
 using System.Xml.Linq;
 using WpfHexaEditor.Core;
 using WpfHexaEditor.Core.Bytes;
@@ -122,6 +124,12 @@ namespace WpfHexaEditor
         /// Get is the first color...
         /// </summary>
         private FirstColor _firstColor = FirstColor.HexByteData;
+
+        /// <summary>
+        /// Set when the first/second selection colour was swapped, so the next UpdateSelection
+        /// repaints the already-selected cells (consumed and reset there).
+        /// </summary>
+        private bool _selectionColorChanged;
 
         /// <summary>
         /// Get or set the scale transform to work with zoom
@@ -579,8 +587,107 @@ namespace WpfHexaEditor
         {
             if (d is not HexEditor ctrl || e.NewValue == e.OldValue) return;
 
+            ctrl.InvalidateTextRenderCache();
             ctrl.RefreshView(true);
         }
+
+        #region Cached text-rendering resources (Typeface / PixelsPerDip)
+
+        private readonly Dictionary<FontWeight, Typeface> _typefaceCache = new();
+        private double _pixelsPerDip;
+        private bool _pixelsPerDipValid;
+
+        /// <summary>
+        /// Cached pixels-per-dip for this control. Avoids a relatively expensive
+        /// <see cref="VisualTreeHelper.GetDpi(Visual)"/> call on every byte render.
+        /// </summary>
+        internal double PixelsPerDip
+        {
+            get
+            {
+                if (!_pixelsPerDipValid)
+                {
+                    _pixelsPerDip = VisualTreeHelper.GetDpi(this).PixelsPerDip;
+                    _pixelsPerDipValid = true;
+                }
+
+                return _pixelsPerDip;
+            }
+        }
+
+        /// <summary>
+        /// Returns a cached <see cref="Typeface"/> for the current font settings and the
+        /// requested weight. Constructing a Typeface per byte per render was a significant
+        /// allocation on the rendering hot path.
+        /// </summary>
+        internal Typeface GetTypeface(FontWeight weight)
+        {
+            if (!_typefaceCache.TryGetValue(weight, out var typeface))
+            {
+                typeface = new Typeface(FontFamily, FontStyle, weight, FontStretch);
+                _typefaceCache[weight] = typeface;
+            }
+
+            return typeface;
+        }
+
+        //Reused FormattedText for byte cells. The drawn strings come from a small, highly
+        //repetitive set (256 hex strings, 256 ASCII chars, a few colours), so building each
+        //once and redrawing it is far cheaper than constructing ~1000+ FormattedText objects
+        //on every refresh. Capped so 16/32-bit and TBL modes (large/unbounded string sets)
+        //can't grow it without bound.
+        private const int FormattedTextCacheCap = 4096;
+        private readonly Dictionary<(string text, Brush brush, FontWeight weight), FormattedText> _formattedTextCache = new();
+        private double _cachedFormattedTextFontSize = -1;
+
+        /// <summary>
+        /// Returns a cached <see cref="FormattedText"/> for the given text/brush/weight using the
+        /// current font settings. Intended for the byte cells, whose text is drawn from a small
+        /// repeating set. Do not use for unique-per-line strings (e.g. line offsets).
+        /// </summary>
+        internal FormattedText GetFormattedText(string text, Brush foreground, FontWeight weight)
+        {
+            //FontSize is baked into a FormattedText; drop the cache if it changed.
+            if (_cachedFormattedTextFontSize != FontSize)
+            {
+                _formattedTextCache.Clear();
+                _cachedFormattedTextFontSize = FontSize;
+            }
+
+            var key = (text ?? string.Empty, foreground, weight);
+
+            if (!_formattedTextCache.TryGetValue(key, out var formattedText))
+            {
+                //Bound memory for large/unbounded string sets (16/32-bit, TBL).
+                if (_formattedTextCache.Count >= FormattedTextCacheCap)
+                    _formattedTextCache.Clear();
+
+                formattedText = new FormattedText(key.Item1, CultureInfo.InvariantCulture,
+                    FlowDirection.LeftToRight, GetTypeface(weight), FontSize, foreground, PixelsPerDip);
+
+                _formattedTextCache[key] = formattedText;
+            }
+
+            return formattedText;
+        }
+
+        /// <summary>
+        /// Clear cached text-rendering resources. Call when font family/style/stretch changes.
+        /// </summary>
+        internal void InvalidateTextRenderCache()
+        {
+            _typefaceCache.Clear();
+            _formattedTextCache.Clear();
+        }
+
+        protected override void OnDpiChanged(DpiScale oldDpi, DpiScale newDpi)
+        {
+            _pixelsPerDipValid = false;
+            _formattedTextCache.Clear(); //pixelsPerDip is baked into cached FormattedText
+            base.OnDpiChanged(oldDpi, newDpi);
+        }
+
+        #endregion
 
         public Brush CurrentLineBrush
         {
@@ -1481,12 +1588,14 @@ namespace WpfHexaEditor
 
                         ctrl.SelectionByte = ctrl._provider.GetByte(ctrl.SelectionStart).singleByte;
 
-                        ctrl.UpdateSelection();
+                        // Update SelectionLine first so UpdateSelection computes IsCurrentLine correctly;
+                        // that makes the previous extra full UpdateVisual() traversal redundant.
                         ctrl.UpdateSelectionLine();
-                        ctrl.UpdateVisual();
+                        ctrl.UpdateSelection();
                         ctrl.UpdateStatusBar(false);
                         ctrl.UpdateLinesInfo();
-                        ctrl.UpdateHeader(true);
+                        // Just re-highlight the selected column instead of clearing and rebuilding the header row.
+                        ctrl.UpdateHeaderHighLight();
                         ctrl.SetScrollMarker(0, ScrollMarker.SelectionStart);
 
                         ctrl.SelectionStartChanged?.Invoke(ctrl, EventArgs.Empty);
@@ -1891,6 +2000,9 @@ namespace WpfHexaEditor
             SelectionStop = position + byteLength - 1;
 
             VerticalScrollBar.Value = CheckIsOpen(_provider) ? GetLineNumber(position) : 0;
+
+            //Programmatic jump: keep the view synchronously up-to-date (don't leave a coalesced refresh pending).
+            FlushPendingRefresh();
         }
 
         /// <summary>
@@ -1917,6 +2029,9 @@ namespace WpfHexaEditor
 
             if (!IsBytePositionAreVisible(position))
                 VerticalScrollBar.Value = CheckIsOpen(_provider) ? GetLineNumber(position) - (MaxVisibleLine / 2) : 0;
+
+            //Programmatic jump: keep the view synchronously up-to-date (don't leave a coalesced refresh pending).
+            FlushPendingRefresh();
         }
 
         /// <summary>
@@ -2811,9 +2926,34 @@ namespace WpfHexaEditor
 
         private void VerticalScrollBar_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
         {
-            RefreshView();
+            //Coalesce rapid scroll ticks (thumb drag / fast wheel) into a single refresh per
+            //render frame instead of a full view rebuild on every intermediate value.
+            RequestRefreshView();
 
             VerticalScrollBarChanged?.Invoke(sender, new ByteEventArgs(FirstVisibleBytePosition));
+        }
+
+        private DispatcherOperation _pendingRefresh;
+
+        /// <summary>
+        /// Schedule a coalesced <see cref="RefreshView"/> on the next render tick. Multiple calls
+        /// before the tick collapse into one refresh. Any code that needs an up-to-date view
+        /// synchronously (e.g. focusing a cell) should call <see cref="FlushPendingRefresh"/> or
+        /// <see cref="RefreshView"/> directly, which supersedes the pending refresh.
+        /// </summary>
+        private void RequestRefreshView()
+        {
+            if (_pendingRefresh is not null) return;
+
+            _pendingRefresh = Dispatcher.BeginInvoke(DispatcherPriority.Render, new Action(() => RefreshView()));
+        }
+
+        /// <summary>
+        /// Run any pending coalesced refresh immediately. Call before reading per-cell view state.
+        /// </summary>
+        private void FlushPendingRefresh()
+        {
+            if (_pendingRefresh is not null) RefreshView();
         }
 
         /// <summary>
@@ -2865,6 +3005,12 @@ namespace WpfHexaEditor
         /// </summary>
         public void RefreshView(bool controlResize = false, bool refreshData = true)
         {
+            //We are refreshing now; cancel any coalesced refresh scheduled by RequestRefreshView().
+            if (_pendingRefresh is not null)
+            {
+                _pendingRefresh.Abort();
+                _pendingRefresh = null;
+            }
 #if DEBUG
             var watch = new Stopwatch();
             watch.Start();
@@ -2874,12 +3020,13 @@ namespace WpfHexaEditor
             if (refreshData)
                 UpdateViewers(controlResize);
 
-            //Update visual of byte control
+            //Update visual of byte control.
+            //Selection, highlight, current-line and visual refresh are folded into a single
+            //tree traversal (one UpdateVisual per cell) instead of the four separate passes
+            //(UpdateSelection + UpdateHighLight + UpdateVisual) the methods would otherwise do.
             UpdateByteModified();
-            UpdateSelection();
-            UpdateHighLight();
+            RefreshSelectionAndVisual();
             UpdateStatusBar(false);
-            UpdateVisual();
             UpdateFocusButDontSteal();
 
             if (controlResize)
@@ -2890,7 +3037,7 @@ namespace WpfHexaEditor
 
 #if DEBUG
             watch.Stop();
-            Debug.Print($"REFRESH TIME: {watch.Elapsed.Milliseconds} ms");
+            Debug.Print($"REFRESH TIME: {watch.Elapsed.TotalMilliseconds:0.00} ms");
 #endif
         }
 
@@ -2923,6 +3070,12 @@ namespace WpfHexaEditor
         /// </summary>
         private void UpdateSelectionColor(FirstColor coloring)
         {
+            // Flag a first/second colour swap so UpdateSelection knows it must repaint the
+            // already-selected cells (their colour depends on FirstSelected), not just the cells
+            // whose selection state changed.
+            if (_firstColor != coloring)
+                _selectionColorChanged = true;
+
             switch (coloring)
             {
                 case FirstColor.HexByteData:
@@ -3121,6 +3274,9 @@ namespace WpfHexaEditor
                     startPosition = VisualByteAdressStart;
 
                 #region Read the data from the provider and warns if necessary to load the bytes that have been deleted
+#if DEBUG
+                var readWatch = Stopwatch.StartNew();
+#endif
                 _provider.Position = startPosition;
                 var readSize = 0;
                 if (HideByteDeleted || CanInsertAnywhere)
@@ -3161,6 +3317,10 @@ namespace WpfHexaEditor
                         ? bufferlength
                         : _viewBuffer.Length);
                 }
+#if DEBUG
+                readWatch.Stop();
+                Debug.Print($"  DATA READ TIME: {readWatch.Elapsed.TotalMilliseconds:0.00} ms ({readSize} bytes)");
+#endif
                 #endregion
 
                 var index = 0;
@@ -3287,6 +3447,14 @@ namespace WpfHexaEditor
             var modifiedBytesDictionary =
                 _provider.GetByteModifieds(ByteAction.All);
 
+            //Nothing modified (always the case for a read-only view): skip the two full
+            //cell traversals entirely.
+            if (modifiedBytesDictionary.Count == 0)
+            {
+                IsModified = _provider.UndoCount > 0;
+                return;
+            }
+
             var exit = false;
             TraverseStringBytes(ctrl =>
             {
@@ -3331,23 +3499,63 @@ namespace WpfHexaEditor
         }
 
         /// <summary>
+        /// Combined selection + highlight + current-line + visual refresh in a single tree
+        /// traversal. Used by <see cref="RefreshView"/> so each cell runs UpdateVisual once
+        /// per refresh instead of the multiple passes the separate Update* methods would do.
+        /// </summary>
+        private void RefreshSelectionAndVisual()
+        {
+            var minSelect = SelectionStart <= SelectionStop ? SelectionStart : SelectionStop;
+            var maxSelect = SelectionStart <= SelectionStop ? SelectionStop : SelectionStart;
+            var hasMarks = _markedPositionList.Count > 0;
+            var hasLength = Length > 0;
+
+            TraverseHexAndStringBytes(ctrl =>
+            {
+                ctrl.IsSelected = ctrl.BytePositionInStream >= minSelect &&
+                                  ctrl.BytePositionInStream <= maxSelect &&
+                                  ctrl.BytePositionInStream != -1 &&
+                                  ctrl.Action != ByteAction.Deleted;
+
+                ctrl.IsHighLight = hasMarks && _markedPositionList.ContainsKey(ctrl.BytePositionInStream);
+
+                ctrl.IsCurrentLine = hasLength && GetLineNumber(ctrl.BytePositionInStream) == SelectionLine;
+
+                ctrl.UpdateVisual();
+            });
+        }
+
+        /// <summary>
         /// Update the selection of byte
         /// </summary>
         private void UpdateSelection()
         {
             var minSelect = SelectionStart <= SelectionStop ? SelectionStart : SelectionStop;
             var maxSelect = SelectionStart <= SelectionStop ? SelectionStop : SelectionStart;
+            var hasLength = Length > 0;
+
+            // Only repaint cells whose state actually changed. The IsSelected/IsCurrentLine setters
+            // already InvalidateVisual on change, so we don't force a repaint on the (typically ~1700)
+            // cells that are unaffected by a caret move — that full repaint was the main per-keystroke
+            // navigation cost. On a first/second selection-colour swap we must still repaint the cells
+            // that stay selected, since only their colour (not their IsSelected flag) changed.
+            var colorChanged = _selectionColorChanged;
+            _selectionColorChanged = false;
 
             TraverseHexAndStringBytes(ctrl =>
             {
-                ctrl.IsSelected = ctrl.BytePositionInStream >= minSelect &&
+                var nowSelected = ctrl.BytePositionInStream >= minSelect &&
                                   ctrl.BytePositionInStream <= maxSelect &&
-                                  ctrl.BytePositionInStream != -1
-                                  && ctrl.Action != ByteAction.Deleted;
+                                  ctrl.BytePositionInStream != -1 &&
+                                  ctrl.Action != ByteAction.Deleted;
 
-                ctrl.IsCurrentLine = Length > 0 && GetLineNumber(ctrl.BytePositionInStream) == SelectionLine;
+                var selectionChanged = ctrl.IsSelected != nowSelected;
 
-                ctrl.UpdateVisual();
+                ctrl.IsSelected = nowSelected; // setter repaints if changed
+                ctrl.IsCurrentLine = hasLength && GetLineNumber(ctrl.BytePositionInStream) == SelectionLine; // setter repaints if changed
+
+                if (nowSelected && !selectionChanged && colorChanged)
+                    ctrl.UpdateVisual();
             });
         }
         /// <summary>
@@ -3420,6 +3628,30 @@ namespace WpfHexaEditor
                 //Add to stackpanel
                 HexHeaderStackPanel.Children.Add(headerLabel);
             }
+        }
+
+        /// <summary>
+        /// Re-highlight the selected column in the existing header row, without clearing and
+        /// rebuilding it. Called on every selection change, so it must stay cheap; only the
+        /// one or two columns whose highlight actually changes are repainted.
+        /// </summary>
+        private void UpdateHeaderHighLight()
+        {
+            if (!CheckIsOpen(_provider)) return;
+
+            var selColumn = HighLightSelectionStart && SelectionStart > -1
+                ? GetColumnNumber(SelectionStart)
+                : -1;
+
+            var column = 0;
+            TraverseHeader(ctrl =>
+            {
+                var hl = column == selColumn;
+                ctrl.SetHighLight(
+                    hl ? FontWeights.Bold : FontWeights.Normal,
+                    hl ? ForegroundHighLightOffSetHeaderColor : ForegroundOffSetHeaderColor);
+                column++;
+            });
         }
 
         /// <summary>
@@ -3646,6 +3878,9 @@ namespace WpfHexaEditor
         {
             if (!CheckIsOpen(_provider)) return;
             if (bytePositionInStream >= _provider.Length) return;
+
+            //Ensure cell positions reflect the latest scroll before we search for the target cell.
+            FlushPendingRefresh();
 
             var rtn = false;
 
@@ -5835,15 +6070,81 @@ namespace WpfHexaEditor
         /// </summary>
         public List<CustomBackgroundBlock> CustomBackgroundBlockItems { get; set; } = new();
 
+        // Cached snapshot of CustomBackgroundBlockItems sorted by StartOffset, plus a prefix-max of
+        // StopOffset. GetCustomBackgroundBlock is called for every visible cell on every refresh;
+        // sorting the whole list per call (the old LINQ OrderBy) was O(cells * n log n) per refresh
+        // and a major GC source with many blocks. With these the common (non-overlapping) lookup is
+        // O(log n) and exact "lowest StartOffset that contains" semantics are preserved.
+        private CustomBackgroundBlock[] _sortedCbbCache;
+        private long[] _cbbPrefixMaxStop;
+        private List<CustomBackgroundBlock> _cbbCacheSource;
+        private int _cbbCacheCount = -1;
+
         /// <summary>
-        /// Get the first CustomBackgroundBlock finded in list.
+        /// Get the first CustomBackgroundBlock (lowest StartOffset) that contains the position
         /// </summary>
-        public CustomBackgroundBlock GetCustomBackgroundBlock(long position) =>
-            CustomBackgroundBlockItems?
-                .OrderBy(c => c.StartOffset)
-                .FirstOrDefault(cbb =>
-                    position >= cbb.StartOffset &&
-                    position <= cbb.StopOffset - 1);
+        public CustomBackgroundBlock GetCustomBackgroundBlock(long position)
+        {
+            var items = CustomBackgroundBlockItems;
+            if (items is null || items.Count == 0)
+                return null;
+
+            // Rebuild the sorted cache only when the collection changed (replaced, or items added/removed)
+            if (!ReferenceEquals(items, _cbbCacheSource) || items.Count != _cbbCacheCount)
+            {
+                _sortedCbbCache = items.OrderBy(c => c.StartOffset).ToArray();
+
+                _cbbPrefixMaxStop = new long[_sortedCbbCache.Length];
+                long runningMax = long.MinValue;
+                for (var i = 0; i < _sortedCbbCache.Length; i++)
+                {
+                    if (_sortedCbbCache[i].StopOffset > runningMax)
+                        runningMax = _sortedCbbCache[i].StopOffset;
+                    _cbbPrefixMaxStop[i] = runningMax;
+                }
+
+                _cbbCacheSource = items;
+                _cbbCacheCount = items.Count;
+            }
+
+            var sorted = _sortedCbbCache;
+
+            // Binary search for the rightmost block whose StartOffset <= position
+            int lo = 0, hi = sorted.Length - 1, hiIdx = -1;
+            while (lo <= hi)
+            {
+                var mid = (lo + hi) >> 1;
+                if (sorted[mid].StartOffset <= position)
+                {
+                    hiIdx = mid;
+                    lo = mid + 1;
+                }
+                else
+                    hi = mid - 1;
+            }
+
+            // No block starts at/before position, or no block in [0..hiIdx] reaches position: no match
+            if (hiIdx < 0 || _cbbPrefixMaxStop[hiIdx] - 1 < position)
+                return null;
+
+            // Fast path: the rightmost candidate contains the position and no earlier block also reaches
+            // it -> it is the unique/lowest-start container (always true for non-overlapping blocks).
+            if (position <= sorted[hiIdx].StopOffset - 1 && (hiIdx == 0 || _cbbPrefixMaxStop[hiIdx - 1] - 1 < position))
+                return sorted[hiIdx];
+
+            // Overlapping blocks: a container is guaranteed to exist; return the lowest-start one.
+            for (var i = 0; i <= hiIdx; i++)
+                if (position <= sorted[i].StopOffset - 1)
+                    return sorted[i];
+
+            return null;
+        }
+
+        /// <summary>
+        /// Force the sorted CustomBackgroundBlock cache to rebuild on next use. Call this if you
+        /// mutate existing block offsets in place without adding/removing items.
+        /// </summary>
+        public void InvalidateCustomBackgroundBlockCache() => _cbbCacheCount = -1;
 
         /// <summary>
         /// Clear the list of custom background block
@@ -5851,6 +6152,7 @@ namespace WpfHexaEditor
         public void ClearCustomBackgroundBlock()
         {
             CustomBackgroundBlockItems.Clear();
+            InvalidateCustomBackgroundBlockCache();
             RefreshView(true);
         }
 
