@@ -6127,17 +6127,24 @@ namespace WpfHexaEditor
             if (hiIdx < 0 || _cbbPrefixMaxStop[hiIdx] - 1 < position)
                 return null;
 
-            // Fast path: the rightmost candidate contains the position and no earlier block also reaches
-            // it -> it is the unique/lowest-start container (always true for non-overlapping blocks).
-            if (position <= sorted[hiIdx].StopOffset - 1 && (hiIdx == 0 || _cbbPrefixMaxStop[hiIdx - 1] - 1 < position))
-                return sorted[hiIdx];
+            // A container exists in [0..hiIdx]. _cbbPrefixMaxStop is a running max, hence monotonic
+            // non-decreasing, so the leftmost index whose prefix-max reaches the position is exactly
+            // the lowest-StartOffset block that contains it (its own StopOffset is what raised the max).
+            // Binary search for it -> O(log n) even for overlapping/nested blocks (no linear fallback).
+            int loFind = 0, hiFind = hiIdx, firstIdx = hiIdx;
+            while (loFind <= hiFind)
+            {
+                var mid = (loFind + hiFind) >> 1;
+                if (_cbbPrefixMaxStop[mid] - 1 >= position)
+                {
+                    firstIdx = mid;
+                    hiFind = mid - 1;
+                }
+                else
+                    loFind = mid + 1;
+            }
 
-            // Overlapping blocks: a container is guaranteed to exist; return the lowest-start one.
-            for (var i = 0; i <= hiIdx; i++)
-                if (position <= sorted[i].StopOffset - 1)
-                    return sorted[i];
-
-            return null;
+            return sorted[firstIdx];
         }
 
         /// <summary>
